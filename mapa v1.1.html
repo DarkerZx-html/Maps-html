@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa Interactivo v1.1</title>
+  
+  <!-- Leaflet y Geocoder -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.1/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <!-- FontAwesome para íconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #clearButton {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 1000;
+      background: #ff4444;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: bold;
+    }
+    #clearButton:hover {
+      background: #cc0000;
+      transform: translateY(-1px);
+    }
+    #statusBar {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <button id="clearButton" title="Borrar marcador actual">
+    <i class="fas fa-trash-alt"></i> Borrar
+  </button>
+  <div id="statusBar">ℹ️ Haz clic en el mapa para añadir un marcador</div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script>
+    // —— Configuración centralizada ——
+    const CONFIG = {
+      centerInitial: [19.4326, -99.1332], // Ciudad de México
+      zoomInitial: 5,
+      zoomPrecision: 13,
+      maxZoom: 18
+    };
+
+    // —— Mapa y estado ——
+    const map = L.map('map', {
+      zoomControl: false // Movemos el control de zoom para mejor UX
+    }).setView(CONFIG.centerInitial, CONFIG.zoomInitial);
+
+    L.control.zoom({ position: 'topright' }).addTo(map); // Zoom personalizado
+
+    let currentMarker = null;
+    let userLocationMarker = null;
+
+    // —— Capa base (Estilo profesional) ——
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: CONFIG.maxZoom
+    }).addTo(map);
+
+    // —— Marcadores personalizados ——
+    const createCustomIcon = (color) => {
+      return L.divIcon({
+        html: `<svg viewBox="0 0 32 32" width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+          <path fill="${color}" d="M16 0c-8.837 0-16 7.163-16 16s7.163 16 16 16 16-7.163 16-16-7.163-16-16-16z"/>
+          <circle cx="16" cy="16" r="8" fill="white"/>
+        </svg>`,
+        className: '', // Eliminamos la clase por defecto
+        iconSize: [24, 24],
+        popupAnchor: [0, -12]
+      });
+    };
+
+    // —— Funciones clave ——
+    const placeMarker = (latlng, label = "Ubicación", isUserLocation = false) => {
+      if (currentMarker && currentMarker !== userLocationMarker) {
+        map.removeLayer(currentMarker);
+      }
+
+      const marker = L.marker(latlng, {
+        icon: createCustomIcon(isUserLocation ? '#3388ff' : '#ff4444')
+      }).addTo(map)
+        .bindPopup(`<b>${label}</b><br>Coords: ${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`);
+
+      if (!isUserLocation) {
+        currentMarker = marker;
+      } else {
+        userLocationMarker = marker;
+      }
+
+      map.setView(latlng, CONFIG.zoomPrecision);
+      updateStatus(`Marcador añadido en: ${label}`);
+      return marker;
+    };
+
+    const updateStatus = (message) => {
+      document.getElementById('statusBar').textContent = `ℹ️ ${message}`;
+    };
+
+    // —— Geolocalización mejorada ——
+    const locateUser = () => {
+      updateStatus("Buscando tu ubicación...");
+      map.locate({ 
+        setView: false,
+        maxZoom: CONFIG.zoomPrecision,
+        enableHighAccuracy: true,
+        timeout: 10000
+      });
+    };
+
+    map.on("locationfound", (e) => {
+      placeMarker(e.latlng, "Tu ubicación", true);
+      updateStatus("Ubicación detectada ✓");
+    });
+
+    map.on("locationerror", (e) => {
+      updateStatus("Error: " + e.message);
+      console.error("Geolocalización falló:", e.message);
+    });
+
+    // —— Geocoder profesional ——
+    const geocoder = L.Control.geocoder({
+      defaultMarkGeocode: false,
+      placeholder: "Buscar dirección...",
+      geocoder: L.Control.Geocoder.nominatim(),
+      errorMessage: "No encontrado",
+      suggestTimeout: 300,
+      position: 'topleft'
+    }).on('markgeocode', (e) => {
+      placeMarker(e.geocode.center, e.geocode.name);
+    }).addTo(map);
+
+    // —— Interacción directa ——
+    map.on('click', (e) => {
+      placeMarker(e.latlng, `Marcador manual (${Date.now().toString().slice(-4)})`);
+    });
+
+    document.getElementById('clearButton').addEventListener('click', () => {
+      if (currentMarker) {
+        map.removeLayer(currentMarker);
+        currentMarker = null;
+        updateStatus("Marcador eliminado");
+      }
+    });
+
+    // —— Inicialización ——
+    locateUser(); // Intenta geolocalizar al cargar
+  </script>
+</body>
+</html>
