@@ -8,7 +8,7 @@ Este es un proyecto de mapa interactivo hecho con **HTML**, **JavaScript**, **Le
 - 🔍 Buscador de direcciones integrado
 - 📌 Puedes colocar un marcador en cualquier parte
 - ♻️ Botón para borrar el marcador
-- 💻 Funciona en PC y 📱 dispositivos móviles
+- 💻 Funciona en PC y 📱 dispositivos móviles (mediante arvhivo)
 - 🧭 Basado en mapas abiertos y libres
 - ⚡️ Compatible como App Web Progresiva (PWA)
 
