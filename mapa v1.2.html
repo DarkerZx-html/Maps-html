@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buscador V1.2</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    /* ======== Tema Oscuro ======== */
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #eee;
+    }
+
+    /* Pantalla de carga */
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 1000;
+    }
+
+    .progress-bar {
+      width: 80%;
+      background: #333;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+
+    .progress {
+      height: 20px;
+      width: 0%;
+      background: limegreen;
+      transition: width 0.3s;
+    }
+
+    /* Contenedor del mapa */
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+
+    /* Barra de búsqueda */
+    #searchBox {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      display: flex;
+      gap: 5px;
+    }
+
+    #searchInput {
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+      width: 250px;
+      background: #1e1e1e;
+      color: #eee;
+    }
+
+    #searchBtn {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      background: limegreen;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- Pantalla de carga -->
+  <div id="loading">
+    <h2>Cargando mapa...</h2>
+    <div class="progress-bar">
+      <div class="progress" id="progress"></div>
+    </div>
+  </div>
+
+  <!-- Barra de búsqueda -->
+  <div id="searchBox" style="display:none;">
+    <input type="text" id="searchInput" placeholder="Buscar lugar...">
+    <button id="searchBtn">🔍</button>
+  </div>
+
+  <!-- Mapa -->
+  <div id="map" style="display:none;"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    let progress = document.getElementById("progress");
+    let loadingScreen = document.getElementById("loading");
+    let mapDiv = document.getElementById("map");
+    let searchBox = document.getElementById("searchBox");
+
+    // Simular carga progresiva
+    let load = 0;
+    let interval = setInterval(() => {
+      load += 20;
+      progress.style.width = load + "%";
+
+      if (load >= 100) {
+        clearInterval(interval);
+        setTimeout(() => {
+          loadingScreen.style.display = "none";
+          mapDiv.style.display = "block";
+          searchBox.style.display = "flex";
+          initMap(); // Inicializar mapa al terminar carga
+        }, 500);
+      }
+    }, 400);
+
+    let map, userMarker;
+
+    // ======== Inicializar mapa ========
+    function initMap() {
+      map = L.map("map").setView([20.57, -101.19], 13); // Salamanca por defecto
+
+      // Tile con tema oscuro
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> | &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: "abcd",
+        maxZoom: 19
+      }).addTo(map);
+
+      // Intentar geolocalización precisa
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            let lat = pos.coords.latitude;
+            let lon = pos.coords.longitude;
+            map.setView([lat, lon], 15);
+            userMarker = L.marker([lat, lon]).addTo(map)
+              .bindPopup("📍 Estás aquí")
+              .openPopup();
+          },
+          err => {
+            console.warn("No se pudo obtener ubicación: ", err.message);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+    }
+
+    // ======== Buscador de lugares ========
+    document.getElementById("searchBtn").addEventListener("click", () => {
+      let query = document.getElementById("searchInput").value;
+      if (!query) return;
+
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=1`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.length > 0) {
+            let lat = data[0].lat;
+            let lon = data[0].lon;
+            map.setView([lat, lon], 15);
+            L.marker([lat, lon]).addTo(map)
+              .bindPopup(`📍 ${data[0].display_name}`)
+              .openPopup();
+          } else {
+            alert("No se encontró el lugar.");
+          }
+        })
+        .catch(err => console.error(err));
+    });
+  </script>
+</body>
+</html>
